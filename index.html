@@ -575,7 +575,7 @@
     years.sort((a, b) => b - a);
 
     const currentVal = yearSelect.value;
-    yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含劃線作廢紀錄)</option>';
+    yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含作廢紀錄)</option>';
     years.forEach(year => {
       const opt = document.createElement('option');
       opt.value = year;
