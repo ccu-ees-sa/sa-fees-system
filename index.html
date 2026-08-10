@@ -682,7 +682,7 @@
   <h3>🔒 系學會幹部驗證登入</h3>
   <div class="form-group">
     <label for="authEmail">幹部 Email：</label>
-    <input type="email" id="authEmail" placeholder="例如：sa@mail.ntpu.edu.tw">
+    <input type="email" id="authEmail" placeholder="例如：sa@ccu.edu.tw">
   </div>
   <div class="form-group">
     <label for="authPassword">密碼：</label>
@@ -717,7 +717,7 @@
       </div>
 
       <div class="form-group">
-        <label for="studentId">學號（例：413235024）：</label>
+        <label for="studentId">學號（例：4XX2350XX）：</label>
         <input type="text" id="studentId" required placeholder="請輸入學號">
       </div>
 
@@ -773,7 +773,7 @@
         本次應收總金額：$<span id="totalDisplay">300</span>
       </div>
 
-      <button type="submit" class="btn-primary">確認送出並儲存至雲端</button>
+      <button type="submit" class="btn-primary">確認送出</button>
     </form>
   </div>
 
@@ -788,8 +788,8 @@
       </div>
 
       <div class="filter-item">
-        <label for="searchInput">🔍 關鍵字搜尋 (學號/姓名/Email/系服/備註)：</label>
-        <input type="text" id="searchInput" placeholder="輸入關鍵字或搜尋『系服』...">
+        <label for="searchInput">🔍 關鍵字搜尋：</label>
+        <input type="text" id="searchInput" placeholder="輸入關鍵字...">
       </div>
     </div>
 
@@ -797,7 +797,7 @@
       <!-- Excel 匯入區塊 -->
       <div>
         <label for="excelFileInput" class="btn-success" style="display: inline-block; cursor: pointer;">
-          📁 選擇 Excel (.xlsx) 匯入舊生/多筆資料
+          📁 選擇 Excel (.xlsx) 匯入多筆資料
         </label>
         <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="uploadExcelToFirebase(event)">
       </div>
