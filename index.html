@@ -11,6 +11,7 @@
       --card-bg: #ffffff;
       --border: #dcdfe6;
       --danger: #d9534f;
+      --success: #28a745;
     }
     body {
       font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif;
@@ -23,6 +24,18 @@
       max-width: 1100px;
       margin: 0 auto;
     }
+    
+    /* 登入區塊 */
+    .auth-card {
+      max-width: 400px;
+      margin: 60px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .auth-card h3 { margin-top: 0; text-align: center; color: var(--primary); }
+
     /* 頁籤導覽 */
     .nav-tabs {
       display: flex;
@@ -55,14 +68,8 @@
     }
 
     /* 表單樣式 */
-    .form-group {
-      margin-bottom: 18px;
-    }
-    label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: bold;
-    }
+    .form-group { margin-bottom: 18px; }
+    label { display: block; margin-bottom: 6px; font-weight: bold; }
     input, select, textarea {
       width: 100%;
       padding: 10px;
@@ -71,10 +78,7 @@
       box-sizing: border-box;
       font-size: 15px;
     }
-    .inline-group {
-      display: flex;
-      gap: 10px;
-    }
+    .inline-group { display: flex; gap: 10px; }
     .inline-group button {
       white-space: nowrap;
       background: #4a5568;
@@ -102,9 +106,7 @@
       font-weight: bold;
       width: 100%;
     }
-    button.btn-primary:hover {
-      opacity: 0.9;
-    }
+    button.btn-primary:hover { opacity: 0.9; }
 
     /* 表格與篩選選單樣式 */
     .filter-bar {
@@ -116,34 +118,13 @@
       border-radius: 6px;
       border: 1px solid var(--border);
     }
-    .filter-item {
-      flex: 1;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid var(--border);
-      padding: 10px 12px;
-      text-align: left;
-      font-size: 14px;
-    }
-    th {
-      background-color: #f0f4f8;
-      color: #1a365d;
-    }
+    .filter-item { flex: 1; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid var(--border); padding: 10px 12px; text-align: left; font-size: 14px; }
+    th { background-color: #f0f4f8; color: #1a365d; }
     
-    /* 作廢列樣式 */
-    tr.deleted-row {
-      background-color: #f2f2f2 !important;
-      color: #888;
-      text-decoration: line-through;
-    }
-    tr.deleted-row td {
-      opacity: 0.6;
-    }
+    tr.deleted-row { background-color: #f2f2f2 !important; color: #888; text-decoration: line-through; }
+    tr.deleted-row td { opacity: 0.6; }
     .deleted-badge {
       display: inline-block;
       background: #e53e3e;
@@ -155,19 +136,33 @@
       margin-left: 5px;
     }
 
-    /* 今日統計：右上角懸浮顯示 */
-    .summary-card {
+    /* 今日統計與登出按鈕 (右上角) */
+    .top-right-bar {
       position: fixed;
-      top: 20px;
+      top: 15px;
       right: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      z-index: 1000;
+    }
+    .summary-card {
       background: var(--primary);
       color: white;
-      padding: 12px 22px;
+      padding: 10px 18px;
       border-radius: 25px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
-      z-index: 1000;
+    }
+    .btn-logout {
+      background: #718096;
+      color: white;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
     }
 
     /* 彈出視窗 (Modal) */
@@ -187,35 +182,530 @@
       width: 340px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 15px;
-    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
     .btn-secondary { background: #cbd5e0; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
     .btn-danger { background: var(--danger); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+    .btn-success { background: var(--success); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
   </style>
+
+  <!-- 引入 SheetJS 用於解析 Excel 檔案 -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- 引入 Firebase SDK (v10) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { 
+      getAuth, 
+      setPersistence, 
+      browserSessionPersistence, 
+      signInWithEmailAndPassword, 
+      sendPasswordResetEmail, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBLBBtmI9536LyIl8Ubm1-iBb8zFX8pI8c",
+      authDomain: "ccuees-sa-fees.firebaseapp.com",
+      databaseURL: "https://ccuees-sa-fees-default-rtdb.firebaseio.com",
+      projectId: "ccuees-sa-fees",
+      storageBucket: "ccuees-sa-fees.firebasestorage.app",
+      messagingSenderId: "274219493089",
+      appId: "1:367204128913:web:a6262cb401aa84b65dd4d6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let records = [];
+    let collectors = JSON.parse(localStorage.getItem('collectors')) || ['小明', '小華'];
+    let lastUsedCollector = localStorage.getItem('lastUsedCollector') || '';
+    let targetDeleteId = null;
+
+    // ⏱️ 10分鐘未操作自動登出機制 (10 分鐘 = 600,000 毫秒)
+    const IDLE_TIMEOUT = 10 * 60 * 1000; 
+    let idleTimer = null;
+
+    function resetIdleTimer() {
+      if (idleTimer) clearTimeout(idleTimer);
+      // 只在登入狀態下開啟自動登出的倒數
+      if (auth.currentUser) {
+        idleTimer = setTimeout(() => {
+          alert("⏱️ 您已超過 10 分鐘未操作系統，為確保帳號安全已自動登出！");
+          signOut(auth);
+        }, IDLE_TIMEOUT);
+      }
+    }
+
+    // 監聽各種使用者操作事件來重置倒數計時器
+    function startIdleDetection() {
+      const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
+      events.forEach(evt => {
+        window.addEventListener(evt, resetIdleTimer, true);
+      });
+      resetIdleTimer();
+    }
+
+    function stopIdleDetection() {
+      if (idleTimer) clearTimeout(idleTimer);
+    }
+
+    // 監聽 Firebase 登入狀態變更
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        document.getElementById('authSection').style.display = 'none';
+        document.getElementById('mainSystem').style.display = 'block';
+        document.getElementById('topRightBar').style.display = 'flex';
+        listenToDatabase();
+        startIdleDetection(); // 啟動 10 分鐘防閒置機制
+      } else {
+        document.getElementById('authSection').style.display = 'block';
+        document.getElementById('mainSystem').style.display = 'none';
+        document.getElementById('topRightBar').style.display = 'none';
+        stopIdleDetection(); // 登出後停止倒數
+      }
+    });
+
+    // 🔒 登入驗證（包含「關閉瀏覽器即自動登出」設定）
+    window.handleLogin = () => {
+      const email = document.getElementById('authEmail').value.trim();
+      const pass = document.getElementById('authPassword').value;
+      
+      if (!email || !pass) { 
+        alert("請輸入 Email 與密碼！"); 
+        return; 
+      }
+
+      // 設定只存活於目前 Session：只要關閉分頁/瀏覽器就會自動登出
+      setPersistence(auth, browserSessionPersistence)
+        .then(() => {
+          return signInWithEmailAndPassword(auth, email, pass);
+        })
+        .catch(error => {
+          console.error(error);
+          alert("❌ 登入失敗：帳號或密碼錯誤！若未開通權限請聯繫管理者。");
+        });
+    };
+
+    // 🔒 安全升級版忘記密碼處理
+    window.handleResetPassword = () => {
+      const email = document.getElementById('authEmail').value.trim();
+      if (!email) { 
+        alert("請先在 Email 欄位輸入你的幹部信箱，再點擊忘記密碼！"); 
+        return; 
+      }
+
+      sendPasswordResetEmail(auth, email)
+        .then(() => {
+          alert(`📧 若此帳號為系統授權幹部，密碼重設信件已寄送至：${email}\n請至信箱（含垃圾郵件匣）查看。`);
+        })
+        .catch((err) => {
+          console.warn("Reset email trigger:", err.message);
+          alert(`📧 若此帳號為系統授權幹部，密碼重設信件已寄送至：${email}\n請至信箱（含垃圾郵件匣）查看。`);
+        });
+    };
+
+    window.handleLogout = () => {
+      signOut(auth).then(() => alert("已成功登出系統！"));
+    };
+
+    // 雲端資料庫即時監聽
+    function listenToDatabase() {
+      const recordsRef = ref(db, 'fee_records');
+      onValue(recordsRef, (snapshot) => {
+        const data = snapshot.val();
+        records = [];
+        if (data) {
+          Object.keys(data).forEach(key => {
+            records.push({ firebaseKey: key, ...data[key] });
+          });
+        }
+        records.sort((a, b) => b.id - a.id);
+        renderYearFilter();
+        renderTable();
+        updateTodayTotal();
+      });
+    }
+
+    // 手動新增資料
+    window.handleFormSubmit = (e) => {
+      e.preventDefault();
+      const studentId = document.getElementById('studentId').value.trim();
+      let entryYear = "未知";
+      if (studentId.length >= 3) {
+        const yrCode = studentId.substring(1, 3);
+        entryYear = yrCode.length === 2 ? "1" + yrCode : yrCode;
+      }
+
+      const planVal = document.getElementById('plan').value;
+      let planName = '';
+      if (planVal === '300') planName = '一學年 ($300)';
+      else if (planVal === '1000') planName = '四年全包 ($1000)';
+      else planName = `自訂金額 ($${document.getElementById('customAmount').value || 0})`;
+
+      const hasTshirt = document.getElementById('hasTshirt').value === 'yes';
+      const paymentMethod = document.getElementById('paymentMethod').value;
+      const bankLast5 = paymentMethod === '轉帳' ? document.getElementById('bankLast5').value.trim() : '';
+
+      if (paymentMethod === '轉帳' && !bankLast5) { alert("請填寫轉帳帳號末 5 碼！"); return; }
+
+      const currentCollector = document.getElementById('collector').value;
+      lastUsedCollector = currentCollector;
+      localStorage.setItem('lastUsedCollector', lastUsedCollector);
+
+      const record = {
+        id: Date.now(),
+        collector: currentCollector,
+        studentId: studentId,
+        entryYear: entryYear,
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        planName: planName,
+        hasTshirt: hasTshirt,
+        totalAmount: calculateTotal(),
+        paymentMethod: paymentMethod,
+        bankLast5: bankLast5,
+        note: document.getElementById('note').value.trim() || "-",
+        timestamp: new Date().toLocaleString('zh-TW', { hour12: false }),
+        isDeleted: false,
+        deleter: ''
+      };
+
+      push(ref(db, 'fee_records'), record)
+        .then(() => {
+          alert('✅ 繳費登記成功！已即時同步至雲端。');
+          document.getElementById('studentId').value = '';
+          document.getElementById('name').value = '';
+          document.getElementById('email').value = '';
+          document.getElementById('note').value = '';
+          document.getElementById('hasTshirt').value = 'no';
+          document.getElementById('plan').value = '300';
+          document.getElementById('customAmountPanel').style.display = 'none';
+          document.getElementById('transferDetailPanel').style.display = 'none';
+          updateCollectorSelect();
+          calculateTotal();
+        })
+        .catch(err => alert("寫入失敗: " + err.message));
+    };
+
+    // 📥 動態解析 Excel 並上傳至 Firebase 雲端
+    window.uploadExcelToFirebase = (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          const jsonRows = XLSX.utils.sheet_to_json(worksheet);
+
+          if (jsonRows.length === 0) {
+            alert("❌ 檔案內容為空！");
+            return;
+          }
+
+          if (!confirm(`確定要匯入 ${jsonRows.length} 筆資料至雲端資料庫嗎？`)) return;
+
+          let successCount = 0;
+          for (let i = 0; i < jsonRows.length; i++) {
+            const row = jsonRows[i];
+            
+            const studentId = String(row['學號'] || row['studentId'] || '').trim();
+            const name = String(row['姓名'] || row['name'] || '').trim();
+            const amount = parseInt(row['繳費金額(舊生補登記)'] || row['金額'] || row['totalAmount'] || 0);
+            const collector = String(row['登記者'] || row['收費人員'] || row['collector'] || '系統匯入').trim();
+
+            if (!studentId || !name) continue;
+
+            let entryYear = "未知";
+            if (studentId.length >= 3) {
+              const yrCode = studentId.substring(1, 3);
+              entryYear = yrCode.length === 2 ? "1" + yrCode : yrCode;
+            }
+
+            const record = {
+              id: Date.now() + i,
+              studentId: studentId,
+              name: name,
+              email: `${studentId}@mail.ntpu.edu.tw`,
+              planName: `舊生補登記 ($${amount})`,
+              hasTshirt: false,
+              totalAmount: amount,
+              paymentMethod: "現金",
+              bankLast5: "",
+              note: "舊生補登記檔案匯入",
+              collector: collector,
+              entryYear: entryYear,
+              timestamp: new Date().toLocaleString('zh-TW', { hour12: false }),
+              isDeleted: false,
+              deleter: ""
+            };
+
+            await push(ref(db, 'fee_records'), record);
+            successCount++;
+          }
+
+          alert(`🎉 成功匯入 ${successCount} 筆資料至 Firebase！`);
+          document.getElementById('excelFileInput').value = '';
+        } catch (err) {
+          alert("解析或匯入失敗: " + err.message);
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    };
+
+    // 作廢紀錄
+    window.confirmDeleteRecord = () => {
+      const deleterName = document.getElementById('deleterName').value.trim();
+      if (!deleterName) { alert("請輸入作廢人員姓名！"); return; }
+
+      const record = records.find(r => r.id === targetDeleteId);
+      if (record && record.firebaseKey) {
+        const updateRef = ref(db, `fee_records/${record.firebaseKey}`);
+        update(updateRef, { isDeleted: true, deleter: deleterName })
+          .then(() => { document.getElementById('deleteModal').style.display = 'none'; })
+          .catch(err => alert("作廢更新失敗: " + err.message));
+      }
+    };
+
+    window.switchTab = (tabName) => {
+      const btnReg = document.getElementById('tabBtnRegister');
+      const btnRec = document.getElementById('tabBtnRecords');
+      const tabReg = document.getElementById('registerTab');
+      const tabRec = document.getElementById('recordsTab');
+
+      if (tabName === 'register') {
+        btnReg.classList.add('active'); btnRec.classList.remove('active');
+        tabReg.classList.add('active'); tabRec.classList.remove('active');
+      } else {
+        btnRec.classList.add('active'); btnReg.classList.remove('active');
+        tabRec.classList.add('active'); tabReg.classList.remove('active');
+        renderYearFilter(); renderTable();
+      }
+    };
+
+    window.calculateTotal = () => {
+      const planVal = document.getElementById('plan').value;
+      let planPrice = planVal === 'custom' ? (parseInt(document.getElementById('customAmount').value) || 0) : (parseInt(planVal) || 0);
+      const tshirtPrice = document.getElementById('hasTshirt').value === 'yes' ? 200 : 0;
+      const total = planPrice + tshirtPrice;
+      document.getElementById('totalDisplay').textContent = total;
+      return total;
+    };
+
+    window.addCollector = () => {
+      const nameInput = document.getElementById('newCollectorInput').value.trim();
+      if (nameInput) {
+        collectors = collectors.filter(c => c !== nameInput);
+        collectors.unshift(nameInput);
+        if (collectors.length > 3) collectors = collectors.slice(0, 3);
+        localStorage.setItem('collectors', JSON.stringify(collectors));
+        lastUsedCollector = nameInput;
+        localStorage.setItem('lastUsedCollector', lastUsedCollector);
+        updateCollectorSelect();
+        document.getElementById('collectorModal').style.display = 'none';
+      }
+    };
+
+    function updateCollectorSelect() {
+      const select = document.getElementById('collector');
+      select.innerHTML = '<option value="">-- 請選擇收費人員 --</option>';
+      collectors.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        select.appendChild(opt);
+      });
+      if (lastUsedCollector && collectors.includes(lastUsedCollector)) {
+        select.value = lastUsedCollector;
+      } else if (collectors.length > 0) {
+        select.value = collectors[0];
+      }
+    }
+
+    function renderYearFilter() {
+      const yearSelect = document.getElementById('yearFilter');
+      const years = [...new Set(records.map(r => r.entryYear))].filter(y => y !== "未知");
+      years.sort((a, b) => b - a);
+      const currentVal = yearSelect.value;
+      yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含劃線作廢紀錄)</option>';
+      years.forEach(year => {
+        const opt = document.createElement('option');
+        opt.value = year; opt.textContent = `${year} 學年度`;
+        yearSelect.appendChild(opt);
+      });
+      yearSelect.value = currentVal;
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('recordsTableBody');
+      const selectedYear = document.getElementById('yearFilter').value;
+      const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
+      tbody.innerHTML = '';
+
+      const filtered = records.filter(r => {
+        const matchesYear = (selectedYear === 'ALL') || (r.entryYear === selectedYear);
+        if (selectedYear !== 'ALL' && r.isDeleted) return false;
+
+        let matchesTshirtSearch = (searchText.includes('系服') || searchText.includes('衣服')) && r.hasTshirt === true;
+        const matchesSearch = r.studentId.toLowerCase().includes(searchText) ||
+                              r.name.toLowerCase().includes(searchText) ||
+                              r.email.toLowerCase().includes(searchText) ||
+                              r.note.toLowerCase().includes(searchText) ||
+                              r.collector.toLowerCase().includes(searchText) ||
+                              matchesTshirtSearch;
+
+        return matchesYear && (searchText === '' ? true : matchesSearch);
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">尚無符合的繳費紀錄</td></tr>';
+        return;
+      }
+
+      filtered.forEach(r => {
+        const tr = document.createElement('tr');
+        if (r.isDeleted) tr.classList.add('deleted-row');
+
+        let detailText = `${r.planName}`;
+        if (r.hasTshirt) detailText += `<br><b style="color:#d9534f;">[加購系服 +$200]</b>`;
+
+        let payText = `$${r.totalAmount} (${r.paymentMethod}`;
+        if (r.paymentMethod === '轉帳' && r.bankLast5) payText += `-${r.bankLast5}`;
+        payText += `)`;
+
+        let timeAndStatus = `<small>${r.timestamp}</small>`;
+        if (r.isDeleted) timeAndStatus += `<br><span class="deleted-badge">[已作廢] 刪除者: ${r.deleter}</span>`;
+
+        const actionBtn = r.isDeleted ? 
+          `<small style="color:#888;">已作廢</small>` : 
+          `<button type="button" onclick="openDeleteModal(${r.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">🗑️ 作廢</button>`;
+
+        tr.innerHTML = `
+          <td><b>${r.studentId}</b></td>
+          <td>${r.name}</td>
+          <td>${r.email}</td>
+          <td>${detailText}</td>
+          <td><b>${payText}</b></td>
+          <td><small>${r.note}</small></td>
+          <td>${r.collector}</td>
+          <td>${timeAndStatus}</td>
+          <td>${actionBtn}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    window.openDeleteModal = (id) => {
+      targetDeleteId = id;
+      document.getElementById('deleterName').value = '';
+      document.getElementById('deleteModal').style.display = 'flex';
+    };
+
+    function updateTodayTotal() {
+      const todayStr = new Date().toLocaleDateString('zh-TW');
+      const todayTotal = records.reduce((sum, r) => {
+        if (r.isDeleted) return sum;
+        const recordDate = new Date(r.id).toLocaleDateString('zh-TW');
+        return recordDate === todayStr ? sum + r.totalAmount : sum;
+      }, 0);
+      document.getElementById('todayTotal').textContent = todayTotal.toLocaleString();
+    }
+
+    window.exportCSV = () => {
+      if (records.length === 0) { alert("目前沒有資料可供匯出！"); return; }
+      let csvContent = "\uFEFF狀態,學號,姓名,Email,繳費方案,加購系服,總金額,付款方式,末5碼,備註,收費人員,登記時間,刪除/作廢者\n";
+      records.forEach(r => {
+        const status = r.isDeleted ? "已作廢" : "正常";
+        const tshirt = r.hasTshirt ? "是" : "否";
+        csvContent += `"${status}","${r.studentId}","${r.name}","${r.email}","${r.planName}","${tshirt}","${r.totalAmount}","${r.paymentMethod}","${r.bankLast5}","${r.note}","${r.collector}","${r.timestamp}","${r.deleter}"\n`;
+      });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `系學會費繳費紀錄_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('plan').addEventListener('change', () => {
+        document.getElementById('customAmountPanel').style.display = document.getElementById('plan').value === 'custom' ? 'block' : 'none';
+        calculateTotal();
+      });
+      document.getElementById('paymentMethod').addEventListener('change', () => {
+        document.getElementById('transferDetailPanel').style.display = document.getElementById('paymentMethod').value === '轉帳' ? 'block' : 'none';
+      });
+      document.getElementById('hasTshirt').addEventListener('change', calculateTotal);
+      document.getElementById('customAmount').addEventListener('input', calculateTotal);
+      document.getElementById('yearFilter').addEventListener('change', renderTable);
+      document.getElementById('searchInput').addEventListener('input', renderTable);
+
+      document.getElementById('openAddCollectorBtn').addEventListener('click', () => {
+        document.getElementById('collectorModal').style.display = 'flex';
+        document.getElementById('newCollectorInput').value = '';
+        document.getElementById('newCollectorInput').focus();
+      });
+      document.getElementById('closeCollectorModalBtn').addEventListener('click', () => {
+        document.getElementById('collectorModal').style.display = 'none';
+      });
+      document.getElementById('confirmAddCollectorBtn').addEventListener('click', addCollector);
+
+      document.getElementById('closeDeleteModalBtn').addEventListener('click', () => {
+        document.getElementById('deleteModal').style.display = 'none';
+      });
+      document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDeleteRecord);
+
+      updateCollectorSelect();
+      calculateTotal();
+    });
+  </script>
 </head>
 <body>
 
-<!-- 右上角今日統計懸浮卡片 -->
-<div class="summary-card">
-  💰 今日總實收：$<span id="todayTotal">0</span>
+<!-- 右上角今日統計與登出 -->
+<div class="top-right-bar" id="topRightBar" style="display: none;">
+  <div class="summary-card">💰 今日總實收：$<span id="todayTotal">0</span></div>
+  <button type="button" class="btn-logout" onclick="handleLogout()">🚪 登出</button>
 </div>
 
-<div class="container">
+<!-- 區塊 1：幹部登入畫面 -->
+<div id="authSection" class="auth-card">
+  <h3>🔒 系學會幹部驗證登入</h3>
+  <div class="form-group">
+    <label for="authEmail">幹部 Email：</label>
+    <input type="email" id="authEmail" placeholder="例如：sa@mail.ntpu.edu.tw">
+  </div>
+  <div class="form-group">
+    <label for="authPassword">密碼：</label>
+    <input type="password" id="authPassword" placeholder="請輸入密碼">
+  </div>
+  <button type="button" class="btn-primary" onclick="handleLogin()">登入系統</button>
+  <div style="margin-top: 15px; text-align: center;">
+    <a href="javascript:void(0)" onclick="handleResetPassword()" style="color: var(--primary); font-size: 14px;">🔑 忘記密碼？點此寄送重設信</a>
+  </div>
+</div>
+
+<!-- 區塊 2：主系統畫面 (登入後顯示) -->
+<div class="container" id="mainSystem" style="display: none;">
   <h2>🎓 系學會費繳納管理系統</h2>
 
-  <!-- 分頁按鈕 -->
   <div class="nav-tabs">
-    <button type="button" class="tab-btn active" id="tabBtnRegister">📝 新增繳費紀錄</button>
-    <button type="button" class="tab-btn" id="tabBtnRecords">📊 繳費紀錄清單</button>
+    <button type="button" class="tab-btn active" id="tabBtnRegister" onclick="switchTab('register')">📝 新增繳費紀錄</button>
+    <button type="button" class="tab-btn" id="tabBtnRecords" onclick="switchTab('records')">📊 繳費紀錄清單</button>
   </div>
 
   <!-- 分頁 1：新增登記 -->
   <div id="registerTab" class="tab-content active">
-    <form id="payForm">
+    <form id="payForm" onsubmit="handleFormSubmit(event)">
       <div class="form-group">
         <label for="collector">收費人員：</label>
         <div class="inline-group">
@@ -227,7 +717,7 @@
       </div>
 
       <div class="form-group">
-        <label for="studentId">學號（例：4XX2350XX）：</label>
+        <label for="studentId">學號（例：413235024）：</label>
         <input type="text" id="studentId" required placeholder="請輸入學號">
       </div>
 
@@ -245,7 +735,7 @@
         <label for="plan">繳費方案：</label>
         <select id="plan" required>
           <option value="300">一學年 ($300)</option>
-          <option value="1000">四年大學全包 ($1000)</option>
+          <option value="1000">四年全包 ($1000)</option>
           <option value="custom">自訂金額</option>
         </select>
         <div id="customAmountPanel" class="sub-panel" style="display: none;">
@@ -254,7 +744,6 @@
         </div>
       </div>
 
-      <!-- 系服選項 -->
       <div class="form-group">
         <label for="hasTshirt">加購系服一件 ($200)：</label>
         <select id="hasTshirt">
@@ -263,7 +752,6 @@
         </select>
       </div>
 
-      <!-- 付款方式選項 -->
       <div class="form-group">
         <label for="paymentMethod">付款方式：</label>
         <select id="paymentMethod">
@@ -276,7 +764,6 @@
         </div>
       </div>
 
-      <!-- 備註欄位 -->
       <div class="form-group">
         <label for="note">備註（選填）：</label>
         <textarea id="note" rows="2" placeholder="如有特殊狀況可於此紀錄..."></textarea>
@@ -286,7 +773,7 @@
         本次應收總金額：$<span id="totalDisplay">300</span>
       </div>
 
-      <button type="submit" class="btn-primary">確認送出並儲存</button>
+      <button type="submit" class="btn-primary">確認送出並儲存至雲端</button>
     </form>
   </div>
 
@@ -296,7 +783,7 @@
       <div class="filter-item">
         <label for="yearFilter">📅 入學年度篩選：</label>
         <select id="yearFilter">
-          <option value="ALL">全部年度 (總覽 - 包含作廢紀錄)</option>
+          <option value="ALL">全部年度 (總覽 - 包含劃線作廢紀錄)</option>
         </select>
       </div>
 
@@ -306,8 +793,16 @@
       </div>
     </div>
 
-    <div style="margin-bottom: 12px; text-align: right;">
-      <button type="button" id="exportCsvBtn" style="padding: 8px 16px; cursor: pointer;">📥 匯出 Excel (CSV)</button>
+    <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+      <!-- Excel 匯入區塊 -->
+      <div>
+        <label for="excelFileInput" class="btn-success" style="display: inline-block; cursor: pointer;">
+          📁 選擇 Excel (.xlsx) 匯入舊生/多筆資料
+        </label>
+        <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="uploadExcelToFirebase(event)">
+      </div>
+
+      <button type="button" onclick="exportCSV()" style="padding: 8px 16px; cursor: pointer;">📥 匯出 Excel (CSV)</button>
     </div>
 
     <table>
@@ -324,9 +819,7 @@
           <th>操作</th>
         </tr>
       </thead>
-      <tbody id="recordsTableBody">
-        <!-- 動態渲染資料 -->
-      </tbody>
+      <tbody id="recordsTableBody"></tbody>
     </table>
   </div>
 </div>
@@ -359,380 +852,5 @@
   </div>
 </div>
 
-<script>
-  // 正確校正後的舊生名單 (411學號已確實歸類為111學年)
-  const legacyData = [{"id": 1700000000000, "collector": "吳思萲", "studentId": "413235011", "entryYear": "113", "name": "張雨媃", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000001, "collector": "吳思萲", "studentId": "413235016", "entryYear": "113", "name": "魏秉泓", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000002, "collector": "吳思萲", "studentId": "413235021", "entryYear": "113", "name": "梁睿軒", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000003, "collector": "吳思萲", "studentId": "413235022", "entryYear": "113", "name": "紀韋丞", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000004, "collector": "吳思萲", "studentId": "413235023", "entryYear": "113", "name": "郭倢羽", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000005, "collector": "吳思萲", "studentId": "413235026", "entryYear": "113", "name": "陳逸謙", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000006, "collector": "吳思萲", "studentId": "413235028", "entryYear": "113", "name": "鄭佳晉", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000007, "collector": "吳思萲", "studentId": "413235032", "entryYear": "113", "name": "黃浩宇", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000008, "collector": "吳思萲", "studentId": "413235033", "entryYear": "113", "name": "賴柏毓", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000009, "collector": "吳思萲", "studentId": "413235039", "entryYear": "113", "name": "江沁宸", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000010, "collector": "吳思萲", "studentId": "413235040", "entryYear": "113", "name": "賴王楷", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000011, "collector": "吳思萲", "studentId": "413235047", "entryYear": "113", "name": "梁宇誠", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000012, "collector": "吳思萲", "studentId": "413235048", "entryYear": "113", "name": "吳芳葶", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000013, "collector": "吳思萲", "studentId": "413235037", "entryYear": "113", "name": "韓富丞", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000014, "collector": "吳思萲", "studentId": "413235013", "entryYear": "113", "name": "戴詠", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000015, "collector": "吳思萲", "studentId": "413235018", "entryYear": "113", "name": "劉兆辰", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000016, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "陳其聖", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000017, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "林嘉俊", "email": "-", "planName": "舊生補登記 ($500)", "hasTshirt": false, "totalAmount": 500, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000018, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "鄭翔元", "email": "-", "planName": "舊生補登記 ($500)", "hasTshirt": false, "totalAmount": 500, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000019, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "張又文", "email": "-", "planName": "舊生補登記 ($500)", "hasTshirt": false, "totalAmount": 500, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000020, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "鄭登展", "email": "-", "planName": "舊生補登記 ($500)", "hasTshirt": false, "totalAmount": 500, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000021, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "張景荃", "email": "-", "planName": "舊生補登記 ($500)", "hasTshirt": false, "totalAmount": 500, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000022, "collector": "吳思萲", "studentId": "412235000", "entryYear": "112", "name": "林瑋棋", "email": "-", "planName": "舊生補登記 ($1000)", "hasTshirt": false, "totalAmount": 1000, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000023, "collector": "吳思萲", "studentId": "414235003", "entryYear": "114", "name": "雙冠任", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000024, "collector": "吳思萲", "studentId": "414235004", "entryYear": "114", "name": "蘇柏守", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000025, "collector": "吳思萲", "studentId": "414235008", "entryYear": "114", "name": "劉馥瑄", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000026, "collector": "吳思萲", "studentId": "414235012", "entryYear": "114", "name": "黃博揚", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000027, "collector": "吳思萲", "studentId": "414235013", "entryYear": "114", "name": "林威錀", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000028, "collector": "吳思萲", "studentId": "414235017", "entryYear": "114", "name": "陳昀萱", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000029, "collector": "吳思萲", "studentId": "414235020", "entryYear": "114", "name": "巫其叡", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000030, "collector": "吳思萲", "studentId": "414235023", "entryYear": "114", "name": "劉士豪", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000031, "collector": "吳思萲", "studentId": "414235024", "entryYear": "114", "name": "張宸維", "email": "-", "planName": "舊生補登記 ($1000)", "hasTshirt": false, "totalAmount": 1000, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000032, "collector": "吳思萲", "studentId": "414235025", "entryYear": "114", "name": "蔡芸喬", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000033, "collector": "吳思萲", "studentId": "414235026", "entryYear": "114", "name": "陳郁緯", "email": "-", "planName": "舊生補登記 ($1000)", "hasTshirt": false, "totalAmount": 1000, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000034, "collector": "吳思萲", "studentId": "414235028", "entryYear": "114", "name": "郭子榮", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000035, "collector": "吳思萲", "studentId": "414235029", "entryYear": "114", "name": "侯佩吟", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000036, "collector": "吳思萲", "studentId": "414235030", "entryYear": "114", "name": "陳嘉儀", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000037, "collector": "吳思萲", "studentId": "414235037", "entryYear": "114", "name": "朱凱謙", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000038, "collector": "吳思萲", "studentId": "414235043", "entryYear": "114", "name": "張郁琪", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000039, "collector": "吳思萲", "studentId": "414235044", "entryYear": "114", "name": "謝逸丞", "email": "-", "planName": "舊生補登記 ($1000)", "hasTshirt": false, "totalAmount": 1000, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000040, "collector": "吳思萲", "studentId": "414235045", "entryYear": "114", "name": "謝季恩", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000041, "collector": "吳思萲", "studentId": "414235046", "entryYear": "114", "name": "傅子洋", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000042, "collector": "吳思萲", "studentId": "414235047", "entryYear": "114", "name": "呂喜筠", "email": "-", "planName": "舊生補登記 ($800)", "hasTshirt": false, "totalAmount": 800, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000043, "collector": "吳思萲", "studentId": "411235002", "entryYear": "111", "name": "李懿修", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000044, "collector": "吳思萲", "studentId": "411235011", "entryYear": "111", "name": "詹安倫", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000045, "collector": "吳思萲", "studentId": "411235015", "entryYear": "111", "name": "林庭葦", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000046, "collector": "吳思萲", "studentId": "411235025", "entryYear": "111", "name": "許芷菱", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000047, "collector": "吳思萲", "studentId": "411235026", "entryYear": "111", "name": "黃詠慈", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000048, "collector": "吳思萲", "studentId": "411235031", "entryYear": "111", "name": "郭俊斌", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000049, "collector": "吳思萲", "studentId": "411235032", "entryYear": "111", "name": "張宣揚", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000050, "collector": "吳思萲", "studentId": "411235034", "entryYear": "111", "name": "李柏軒", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000051, "collector": "吳思萲", "studentId": "411235047", "entryYear": "111", "name": "丁皓哲", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}, {"id": 1700000000052, "collector": "吳思萲", "studentId": "411235000", "entryYear": "111", "name": "潘書言", "email": "-", "planName": "舊生補登記 ($600)", "hasTshirt": false, "totalAmount": 600, "paymentMethod": "現金", "bankLast5": "", "note": "Excel匯入舊生資料", "timestamp": "2026/08/08 00:00:00", "isDeleted": false, "deleter": ""}];
-
-  // 初始化資料儲存
-  let collectors = JSON.parse(localStorage.getItem('collectors')) || ['吳思萲', '小明', '小華'];
-  let records = JSON.parse(localStorage.getItem('records')) || legacyData;
-  let lastUsedCollector = localStorage.getItem('lastUsedCollector') || '';
-  let targetDeleteId = null;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    // 分頁按鈕
-    document.getElementById('tabBtnRegister').addEventListener('click', () => switchTab('register'));
-    document.getElementById('tabBtnRecords').addEventListener('click', () => switchTab('records'));
-
-    // 表單變更事件
-    document.getElementById('plan').addEventListener('change', handlePlanChange);
-    document.getElementById('customAmount').addEventListener('input', calculateTotal);
-    document.getElementById('hasTshirt').addEventListener('change', calculateTotal);
-    document.getElementById('paymentMethod').addEventListener('change', handlePaymentChange);
-
-    // 搜尋與篩選
-    document.getElementById('yearFilter').addEventListener('change', renderTable);
-    document.getElementById('searchInput').addEventListener('input', renderTable);
-
-    // 匯出 Excel
-    document.getElementById('exportCsvBtn').addEventListener('click', exportCSV);
-
-    // 彈窗按鈕
-    document.getElementById('openAddCollectorBtn').addEventListener('click', () => {
-      document.getElementById('collectorModal').style.display = 'flex';
-      document.getElementById('newCollectorInput').value = '';
-      document.getElementById('newCollectorInput').focus();
-    });
-    document.getElementById('closeCollectorModalBtn').addEventListener('click', () => {
-      document.getElementById('collectorModal').style.display = 'none';
-    });
-    document.getElementById('confirmAddCollectorBtn').addEventListener('click', addCollector);
-
-    document.getElementById('closeDeleteModalBtn').addEventListener('click', () => {
-      document.getElementById('deleteModal').style.display = 'none';
-    });
-    document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDeleteRecord);
-
-    // 表單提交
-    document.getElementById('payForm').addEventListener('submit', handleFormSubmit);
-
-    // 自動維護與整理超舊資料
-    autoCleanTenYearsOldData();
-
-    // 初始化渲染
-    updateCollectorSelect();
-    calculateTotal();
-    renderYearFilter();
-    renderTable();
-    updateTodayTotal();
-  });
-
-  function switchTab(tabName) {
-    const btnReg = document.getElementById('tabBtnRegister');
-    const btnRec = document.getElementById('tabBtnRecords');
-    const tabReg = document.getElementById('registerTab');
-    const tabRec = document.getElementById('recordsTab');
-
-    if (tabName === 'register') {
-      btnReg.classList.add('active');
-      btnRec.classList.remove('active');
-      tabReg.classList.add('active');
-      tabRec.classList.remove('active');
-    } else {
-      btnRec.classList.add('active');
-      btnReg.classList.remove('active');
-      tabRec.classList.add('active');
-      tabReg.classList.remove('active');
-      renderYearFilter();
-      renderTable();
-    }
-  }
-
-  function handlePlanChange() {
-    const isCustom = document.getElementById('plan').value === 'custom';
-    document.getElementById('customAmountPanel').style.display = isCustom ? 'block' : 'none';
-    calculateTotal();
-  }
-
-  function handlePaymentChange() {
-    const isTransfer = document.getElementById('paymentMethod').value === '轉帳';
-    document.getElementById('transferDetailPanel').style.display = isTransfer ? 'block' : 'none';
-  }
-
-  function addCollector() {
-    const nameInput = document.getElementById('newCollectorInput').value.trim();
-    if (nameInput) {
-      collectors = collectors.filter(c => c !== nameInput);
-      collectors.unshift(nameInput);
-      if (collectors.length > 3) collectors = collectors.slice(0, 3);
-
-      localStorage.setItem('collectors', JSON.stringify(collectors));
-      lastUsedCollector = nameInput;
-      localStorage.setItem('lastUsedCollector', lastUsedCollector);
-      
-      updateCollectorSelect();
-      document.getElementById('collectorModal').style.display = 'none';
-    } else {
-      alert("請輸入有效的姓名！");
-    }
-  }
-
-  function updateCollectorSelect() {
-    const select = document.getElementById('collector');
-    select.innerHTML = '<option value="">-- 請選擇收費人員 --</option>';
-    collectors.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c;
-      opt.textContent = c;
-      select.appendChild(opt);
-    });
-
-    if (lastUsedCollector && collectors.includes(lastUsedCollector)) {
-      select.value = lastUsedCollector;
-    } else if (collectors.length > 0) {
-      select.value = collectors[0];
-    }
-  }
-
-  function calculateTotal() {
-    const planVal = document.getElementById('plan').value;
-    let planPrice = 0;
-
-    if (planVal === 'custom') {
-      planPrice = parseInt(document.getElementById('customAmount').value) || 0;
-    } else {
-      planPrice = parseInt(planVal) || 0;
-    }
-
-    const hasTshirt = document.getElementById('hasTshirt').value === 'yes';
-    const tshirtPrice = hasTshirt ? 200 : 0;
-
-    const total = planPrice + tshirtPrice;
-    document.getElementById('totalDisplay').textContent = total;
-    return total;
-  }
-
-  function handleFormSubmit(e) {
-    e.preventDefault();
-
-    const studentId = document.getElementById('studentId').value.trim();
-    let entryYear = "未知";
-    if (studentId.length >= 3) {
-      const yrCode = studentId.substring(1, 3);
-      entryYear = yrCode.length === 2 ? "1" + yrCode : yrCode;
-    }
-
-    const planVal = document.getElementById('plan').value;
-    let planName = '';
-    if (planVal === '300') planName = '一學年 ($300)';
-    else if (planVal === '1000') planName = '四年全包 ($1000)';
-    else planName = `自訂金額 ($${document.getElementById('customAmount').value || 0})`;
-
-    const hasTshirt = document.getElementById('hasTshirt').value === 'yes';
-    const paymentMethod = document.getElementById('paymentMethod').value;
-    const bankLast5 = paymentMethod === '轉帳' ? document.getElementById('bankLast5').value.trim() : '';
-
-    if (paymentMethod === '轉帳' && !bankLast5) {
-      alert("請填寫轉帳帳號末 5 碼！");
-      return;
-    }
-
-    const currentCollector = document.getElementById('collector').value;
-    lastUsedCollector = currentCollector;
-    localStorage.setItem('lastUsedCollector', lastUsedCollector);
-
-    const record = {
-      id: Date.now(),
-      collector: currentCollector,
-      studentId: studentId,
-      entryYear: entryYear,
-      name: document.getElementById('name').value.trim(),
-      email: document.getElementById('email').value.trim(),
-      planName: planName,
-      hasTshirt: hasTshirt,
-      totalAmount: calculateTotal(),
-      paymentMethod: paymentMethod,
-      bankLast5: bankLast5,
-      note: document.getElementById('note').value.trim() || "-",
-      timestamp: new Date().toLocaleString('zh-TW', { hour12: false }),
-      isDeleted: false,
-      deleter: ''
-    };
-
-    records.unshift(record);
-    autoCleanTenYearsOldData();
-    localStorage.setItem('records', JSON.stringify(records));
-
-    alert('✅ 繳費登記成功！');
-    
-    document.getElementById('studentId').value = '';
-    document.getElementById('name').value = '';
-    document.getElementById('email').value = '';
-    document.getElementById('note').value = '';
-    document.getElementById('hasTshirt').value = 'no';
-    document.getElementById('plan').value = '300';
-    document.getElementById('customAmountPanel').style.display = 'none';
-    document.getElementById('transferDetailPanel').style.display = 'none';
-    
-    updateCollectorSelect();
-    calculateTotal();
-    updateTodayTotal();
-  }
-
-  function renderYearFilter() {
-    const yearSelect = document.getElementById('yearFilter');
-    const years = [...new Set(records.map(r => r.entryYear))].filter(y => y !== "未知");
-    years.sort((a, b) => b - a);
-
-    const currentVal = yearSelect.value;
-    yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含作廢紀錄)</option>';
-    years.forEach(year => {
-      const opt = document.createElement('option');
-      opt.value = year;
-      opt.textContent = `${year} 學年度`;
-      yearSelect.appendChild(opt);
-    });
-    yearSelect.value = currentVal;
-  }
-
-  // 渲染表格 (依據你的指示修正過濾條件)
-  function renderTable() {
-    const tbody = document.getElementById('recordsTableBody');
-    const selectedYear = document.getElementById('yearFilter').value;
-    const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
-
-    tbody.innerHTML = '';
-
-    const filtered = records.filter(r => {
-      const matchesYear = (selectedYear === 'ALL') || (r.entryYear === selectedYear);
-      
-      // ✅ 關鍵條件修復：
-      // 1. 點選「特定學年度 (例如 115, 114...)」時：自動過濾掉已作廢/刪除的紀錄 (無刪除紀錄)
-      // 2. 點選「全部年度 (總覽)」時：保留並顯示劃線淡化的刪除紀錄！
-      if (selectedYear !== 'ALL' && r.isDeleted) {
-        return false;
-      }
-
-      let matchesTshirtSearch = false;
-      if (searchText.includes('系服') || searchText.includes('衣服')) {
-        matchesTshirtSearch = r.hasTshirt === true;
-      }
-
-      const matchesSearch = r.studentId.toLowerCase().includes(searchText) ||
-                            r.name.toLowerCase().includes(searchText) ||
-                            r.email.toLowerCase().includes(searchText) ||
-                            r.note.toLowerCase().includes(searchText) ||
-                            r.collector.toLowerCase().includes(searchText) ||
-                            matchesTshirtSearch;
-
-      return matchesYear && (searchText === '' ? true : matchesSearch);
-    });
-
-    if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">尚無符合的繳費紀錄</td></tr>';
-      return;
-    }
-
-    filtered.forEach(r => {
-      const tr = document.createElement('tr');
-      if (r.isDeleted) tr.classList.add('deleted-row');
-
-      let detailText = `${r.planName}`;
-      if (r.hasTshirt) {
-        detailText += `<br><b style="color:#d9534f;">[加購系服 +$200]</b>`;
-      }
-
-      let payText = `$${r.totalAmount} (${r.paymentMethod}`;
-      if (r.paymentMethod === '轉帳' && r.bankLast5) {
-        payText += `-${r.bankLast5}`;
-      }
-      payText += `)`;
-
-      let timeAndStatus = `<small>${r.timestamp}</small>`;
-      if (r.isDeleted) {
-        timeAndStatus += `<br><span class="deleted-badge">[已作廢] 刪除者: ${r.deleter}</span>`;
-      }
-
-      const actionBtn = r.isDeleted ? 
-        `<small style="color:#888;">已作廢</small>` : 
-        `<button type="button" onclick="openDeleteModal(${r.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:3px; cursor:pointer;">🗑️ 作廢</button>`;
-
-      tr.innerHTML = `
-        <td><b>${r.studentId}</b></td>
-        <td>${r.name}</td>
-        <td>${r.email}</td>
-        <td>${detailText}</td>
-        <td><b>${payText}</b></td>
-        <td><small>${r.note}</small></td>
-        <td>${r.collector}</td>
-        <td>${timeAndStatus}</td>
-        <td>${actionBtn}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function openDeleteModal(id) {
-    targetDeleteId = id;
-    document.getElementById('deleterName').value = '';
-    document.getElementById('deleteModal').style.display = 'flex';
-  }
-
-  function confirmDeleteRecord() {
-    const deleterName = document.getElementById('deleterName').value.trim();
-    if (!deleterName) {
-      alert("請輸入作廢人員姓名！");
-      return;
-    }
-
-    const record = records.find(r => r.id === targetDeleteId);
-    if (record) {
-      record.isDeleted = true;
-      record.deleter = deleterName;
-      localStorage.setItem('records', JSON.stringify(records));
-      
-      document.getElementById('deleteModal').style.display = 'none';
-      renderTable();
-      updateTodayTotal();
-    }
-  }
-
-  // 自動清理 10 年以前的超舊歷史資料
-  function autoCleanTenYearsOldData() {
-    const currentRocYear = new Date().getFullYear() - 1911; // 目前民國年 (2026 -> 115)
-    const thresholdYear = currentRocYear - 10;
-
-    records = records.filter(r => {
-      const yr = parseInt(r.entryYear);
-      if (isNaN(yr)) return true;
-      return yr > thresholdYear;
-    });
-  }
-
-  function updateTodayTotal() {
-    const todayStr = new Date().toLocaleDateString('zh-TW');
-    
-    const todayTotal = records.reduce((sum, r) => {
-      if (r.isDeleted) return sum;
-      const recordDate = new Date(r.id).toLocaleDateString('zh-TW');
-      return recordDate === todayStr ? sum + r.totalAmount : sum;
-    }, 0);
-
-    document.getElementById('todayTotal').textContent = todayTotal.toLocaleString();
-  }
-
-  function exportCSV() {
-    if (records.length === 0) {
-      alert("目前沒有資料可供匯出！");
-      return;
-    }
-
-    let csvContent = "\uFEFF狀態,學號,姓名,Email,繳費方案,加購系服,總金額,付款方式,末5碼,備註,收費人員,登記時間,刪除/作廢者\n";
-    records.forEach(r => {
-      const status = r.isDeleted ? "已作廢" : "正常";
-      const tshirt = r.hasTshirt ? "是" : "否";
-      csvContent += `"${status}","${r.studentId}","${r.name}","${r.email}","${r.planName}","${tshirt}","${r.totalAmount}","${r.paymentMethod}","${r.bankLast5}","${r.note}","${r.collector}","${r.timestamp}","${r.deleter}"\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `系學會費繳費紀錄_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-</script>
 </body>
 </html>
