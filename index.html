@@ -366,7 +366,7 @@
         email: document.getElementById('email').value.trim(),
         planName: planName,
         tshirtCount: tshirtCount,
-        hasTshirt: tshirtCount > 0, // 保持向下相容舊欄位
+        hasTshirt: tshirtCount > 0,
         totalAmount: calculateTotal(),
         paymentMethod: paymentMethod,
         bankLast5: bankLast5,
@@ -493,7 +493,6 @@
       }
     };
 
-    // 🧮 計算總金額（含件數支援）
     window.calculateTotal = () => {
       const planVal = document.getElementById('plan').value;
       let planPrice = planVal === 'custom' ? (parseInt(document.getElementById('customAmount').value) || 0) : (parseInt(planVal) || 0);
@@ -585,9 +584,9 @@
         return matchesYear && (searchText === '' ? true : matchesSearch);
       });
 
-      // 排序邏輯：學號由大到小排序
+      // 🔄 修正排序邏輯：學號由小到大排序 (413235001 開始往大號排列)
       filtered.sort((a, b) => {
-        return b.studentId.localeCompare(a.studentId, undefined, { numeric: true, sensitivity: 'base' });
+        return a.studentId.localeCompare(b.studentId, undefined, { numeric: true, sensitivity: 'base' });
       });
 
       if (filtered.length === 0) {
@@ -785,7 +784,7 @@
         </div>
       </div>
 
-      <!-- 👕 新增：系服數量選擇選項 -->
+      <!-- 👕 系服數量選擇選項 -->
       <div class="form-group">
         <label for="tshirtCount">加購系服件數 (每件 $200)：</label>
         <select id="tshirtCount">
