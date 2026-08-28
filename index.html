@@ -585,10 +585,10 @@
       });
 
       // 🔀 雙重排序邏輯：
-      // - 全部年度 (selectedYear === 'ALL')：按新增/登記時間順序 (id 升冪)
+      // - 全部年度 (selectedYear === 'ALL')：新新增的在最上面 (id 降冪排序)
       // - 個別學年度 (selectedYear !== 'ALL')：按學號升冪排序 (413235001 開始往大號排列)
       if (selectedYear === 'ALL') {
-        filtered.sort((a, b) => (a.id || 0) - (b.id || 0));
+        filtered.sort((a, b) => (b.id || 0) - (a.id || 0));
       } else {
         filtered.sort((a, b) => {
           return a.studentId.localeCompare(b.studentId, undefined, { numeric: true, sensitivity: 'base' });
