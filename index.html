@@ -12,6 +12,7 @@
       --border: #dcdfe6;
       --danger: #d9534f;
       --success: #28a745;
+      --warning: #e67e22;
     }
     body {
       font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif;
@@ -134,6 +135,16 @@
       border-radius: 3px;
       text-decoration: none !important;
       margin-left: 5px;
+    }
+    .expired-badge {
+      display: inline-block;
+      background: var(--warning);
+      color: white;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-decoration: none !important;
+      margin-top: 3px;
     }
 
     /* 今日統計與登出按鈕 (右上角) */
@@ -529,12 +540,15 @@
       }
     }
 
+    // 年度下拉選單（由大到小排序，如 114, 113, 112...）
     function renderYearFilter() {
       const yearSelect = document.getElementById('yearFilter');
       const years = [...new Set(records.map(r => r.entryYear))].filter(y => y !== "未知");
-      years.sort((a, b) => b - a);
+      
+      years.sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+
       const currentVal = yearSelect.value;
-      yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含作廢紀錄)</option>';
+      yearSelect.innerHTML = '<option value="ALL">全部年度 (總覽 - 包含劃線作廢紀錄)</option>';
       years.forEach(year => {
         const opt = document.createElement('option');
         opt.value = year; opt.textContent = `${year} 學年度`;
@@ -543,12 +557,28 @@
       yearSelect.value = currentVal;
     }
 
+    // 判斷是否為「一學年」且已經超過一年（365天）
+    function checkIsOneYearExpired(record) {
+      if (!record.planName || !record.planName.includes('一學年')) return false;
+
+      let recTime = record.id;
+      if (!recTime || isNaN(recTime)) {
+        recTime = new Date(record.timestamp).getTime();
+      }
+
+      if (!recTime || isNaN(recTime)) return false;
+
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      return (Date.now() - recTime) > oneYearMs;
+    }
+
     function renderTable() {
       const tbody = document.getElementById('recordsTableBody');
       const selectedYear = document.getElementById('yearFilter').value;
       const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
       tbody.innerHTML = '';
 
+      // 1. 進行年度與關鍵字篩選
       const filtered = records.filter(r => {
         const matchesYear = (selectedYear === 'ALL') || (r.entryYear === selectedYear);
         if (selectedYear !== 'ALL' && r.isDeleted) return false;
@@ -564,14 +594,26 @@
         return matchesYear && (searchText === '' ? true : matchesSearch);
       });
 
+      // 2. 🔥 【關鍵修改】將符合篩選條件的資料「按學號由大到小排序」
+      filtered.sort((a, b) => {
+        // 先嘗試使用 localeCompare 進行字串/數字比較 (數字優先大到小)
+        return b.studentId.localeCompare(a.studentId, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
       if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">尚無符合的繳費紀錄</td></tr>';
         return;
       }
 
+      // 3. 渲染至表格畫面
       filtered.forEach(r => {
         const tr = document.createElement('tr');
-        if (r.isDeleted) tr.classList.add('deleted-row');
+        const isOneYearExpired = checkIsOneYearExpired(r);
+
+        // 若為「作廢」或「一學年過期」，均自動劃掉 (套用刪除線樣式)
+        if (r.isDeleted || isOneYearExpired) {
+          tr.classList.add('deleted-row');
+        }
 
         let detailText = `${r.planName}`;
         if (r.hasTshirt) detailText += `<br><b style="color:#d9534f;">[加購系服 +$200]</b>`;
@@ -581,7 +623,11 @@
         payText += `)`;
 
         let timeAndStatus = `<small>${r.timestamp}</small>`;
-        if (r.isDeleted) timeAndStatus += `<br><span class="deleted-badge">[已作廢] 刪除者: ${r.deleter}</span>`;
+        if (r.isDeleted) {
+          timeAndStatus += `<br><span class="deleted-badge">[已作廢] 刪除者: ${r.deleter}</span>`;
+        } else if (isOneYearExpired) {
+          timeAndStatus += `<br><span class="expired-badge">[會員資格已到期 (滿1年)]</span>`;
+        }
 
         const actionBtn = r.isDeleted ? 
           `<small style="color:#888;">已作廢</small>` : 
@@ -622,7 +668,11 @@
       if (records.length === 0) { alert("目前沒有資料可供匯出！"); return; }
       let csvContent = "\uFEFF狀態,學號,姓名,Email,繳費方案,加購系服,總金額,付款方式,末5碼,備註,收費人員,登記時間,刪除/作廢者\n";
       records.forEach(r => {
-        const status = r.isDeleted ? "已作廢" : "正常";
+        const isExpired = checkIsOneYearExpired(r);
+        let status = "正常";
+        if (r.isDeleted) status = "已作廢";
+        else if (isExpired) status = "會員到期(滿1年)";
+
         const tshirt = r.hasTshirt ? "是" : "否";
         csvContent += `"${status}","${r.studentId}","${r.name}","${r.email}","${r.planName}","${tshirt}","${r.totalAmount}","${r.paymentMethod}","${r.bankLast5}","${r.note}","${r.collector}","${r.timestamp}","${r.deleter}"\n`;
       });
