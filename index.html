@@ -235,13 +235,12 @@
     let lastUsedCollector = localStorage.getItem('lastUsedCollector') || '';
     let targetDeleteId = null;
 
-    // ⏱️ 10分鐘未操作自動登出機制 (10 分鐘 = 600,000 毫秒)
+    // ⏱️ 10分鐘未操作自動登出機制
     const IDLE_TIMEOUT = 10 * 60 * 1000; 
     let idleTimer = null;
 
     function resetIdleTimer() {
       if (idleTimer) clearTimeout(idleTimer);
-      // 只在登入狀態下開啟自動登出的倒數
       if (auth.currentUser) {
         idleTimer = setTimeout(() => {
           alert("⏱️ 您已超過 10 分鐘未操作系統，為確保帳號安全已自動登出！");
@@ -250,7 +249,6 @@
       }
     }
 
-    // 監聽各種使用者操作事件來重置倒數計時器
     function startIdleDetection() {
       const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
       events.forEach(evt => {
@@ -263,23 +261,21 @@
       if (idleTimer) clearTimeout(idleTimer);
     }
 
-    // 監聽 Firebase 登入狀態變更
     onAuthStateChanged(auth, (user) => {
       if (user) {
         document.getElementById('authSection').style.display = 'none';
         document.getElementById('mainSystem').style.display = 'block';
         document.getElementById('topRightBar').style.display = 'flex';
         listenToDatabase();
-        startIdleDetection(); // 啟動 10 分鐘防閒置機制
+        startIdleDetection();
       } else {
         document.getElementById('authSection').style.display = 'block';
         document.getElementById('mainSystem').style.display = 'none';
         document.getElementById('topRightBar').style.display = 'none';
-        stopIdleDetection(); // 登出後停止倒數
+        stopIdleDetection();
       }
     });
 
-    // 🔒 登入驗證（包含「關閉瀏覽器即自動登出」設定）
     window.handleLogin = () => {
       const email = document.getElementById('authEmail').value.trim();
       const pass = document.getElementById('authPassword').value;
@@ -289,7 +285,6 @@
         return; 
       }
 
-      // 設定只存活於目前 Session：只要關閉分頁/瀏覽器就會自動登出
       setPersistence(auth, browserSessionPersistence)
         .then(() => {
           return signInWithEmailAndPassword(auth, email, pass);
@@ -300,7 +295,6 @@
         });
     };
 
-    // 🔒 安全升級版忘記密碼處理
     window.handleResetPassword = () => {
       const email = document.getElementById('authEmail').value.trim();
       if (!email) { 
@@ -322,7 +316,6 @@
       signOut(auth).then(() => alert("已成功登出系統！"));
     };
 
-    // 雲端資料庫即時監聽
     function listenToDatabase() {
       const recordsRef = ref(db, 'fee_records');
       onValue(recordsRef, (snapshot) => {
@@ -333,14 +326,12 @@
             records.push({ firebaseKey: key, ...data[key] });
           });
         }
-        records.sort((a, b) => b.id - a.id);
         renderYearFilter();
         renderTable();
         updateTodayTotal();
       });
     }
 
-    // 手動新增資料
     window.handleFormSubmit = (e) => {
       e.preventDefault();
       const studentId = document.getElementById('studentId').value.trim();
@@ -356,7 +347,7 @@
       else if (planVal === '1000') planName = '四年全包 ($1000)';
       else planName = `自訂金額 ($${document.getElementById('customAmount').value || 0})`;
 
-      const hasTshirt = document.getElementById('hasTshirt').value === 'yes';
+      const tshirtCount = parseInt(document.getElementById('tshirtCount').value) || 0;
       const paymentMethod = document.getElementById('paymentMethod').value;
       const bankLast5 = paymentMethod === '轉帳' ? document.getElementById('bankLast5').value.trim() : '';
 
@@ -374,7 +365,8 @@
         name: document.getElementById('name').value.trim(),
         email: document.getElementById('email').value.trim(),
         planName: planName,
-        hasTshirt: hasTshirt,
+        tshirtCount: tshirtCount,
+        hasTshirt: tshirtCount > 0, // 保持向下相容舊欄位
         totalAmount: calculateTotal(),
         paymentMethod: paymentMethod,
         bankLast5: bankLast5,
@@ -391,7 +383,7 @@
           document.getElementById('name').value = '';
           document.getElementById('email').value = '';
           document.getElementById('note').value = '';
-          document.getElementById('hasTshirt').value = 'no';
+          document.getElementById('tshirtCount').value = '0';
           document.getElementById('plan').value = '300';
           document.getElementById('customAmountPanel').style.display = 'none';
           document.getElementById('transferDetailPanel').style.display = 'none';
@@ -401,7 +393,6 @@
         .catch(err => alert("寫入失敗: " + err.message));
     };
 
-    // 📥 動態解析 Excel 並上傳至 Firebase 雲端
     window.uploadExcelToFirebase = (event) => {
       const file = event.target.files[0];
       if (!file) return;
@@ -446,6 +437,7 @@
               name: name,
               email: "-",
               planName: `舊生補登記 ($${amount})`,
+              tshirtCount: 0,
               hasTshirt: false,
               totalAmount: amount,
               paymentMethod: "現金",
@@ -472,7 +464,6 @@
       reader.readAsArrayBuffer(file);
     };
 
-    // 作廢紀錄
     window.confirmDeleteRecord = () => {
       const deleterName = document.getElementById('deleterName').value.trim();
       if (!deleterName) { alert("請輸入作廢人員姓名！"); return; }
@@ -502,10 +493,12 @@
       }
     };
 
+    // 🧮 計算總金額（含件數支援）
     window.calculateTotal = () => {
       const planVal = document.getElementById('plan').value;
       let planPrice = planVal === 'custom' ? (parseInt(document.getElementById('customAmount').value) || 0) : (parseInt(planVal) || 0);
-      const tshirtPrice = document.getElementById('hasTshirt').value === 'yes' ? 200 : 0;
+      const tshirtCount = parseInt(document.getElementById('tshirtCount').value) || 0;
+      const tshirtPrice = tshirtCount * 200;
       const total = planPrice + tshirtPrice;
       document.getElementById('totalDisplay').textContent = total;
       return total;
@@ -540,7 +533,6 @@
       }
     }
 
-    // 年度下拉選單（由大到小排序，如 114, 113, 112...）
     function renderYearFilter() {
       const yearSelect = document.getElementById('yearFilter');
       const years = [...new Set(records.map(r => r.entryYear))].filter(y => y !== "未知");
@@ -557,7 +549,6 @@
       yearSelect.value = currentVal;
     }
 
-    // 判斷是否為「一學年」且已經超過一年（365天）
     function checkIsOneYearExpired(record) {
       if (!record.planName || !record.planName.includes('一學年')) return false;
 
@@ -578,12 +569,12 @@
       const searchText = document.getElementById('searchInput').value.toLowerCase().trim();
       tbody.innerHTML = '';
 
-      // 1. 進行年度與關鍵字篩選
       const filtered = records.filter(r => {
         const matchesYear = (selectedYear === 'ALL') || (r.entryYear === selectedYear);
         if (selectedYear !== 'ALL' && r.isDeleted) return false;
 
-        let matchesTshirtSearch = (searchText.includes('系服') || searchText.includes('衣服')) && r.hasTshirt === true;
+        const count = r.tshirtCount ?? (r.hasTshirt ? 1 : 0);
+        let matchesTshirtSearch = (searchText.includes('系服') || searchText.includes('衣服')) && count > 0;
         const matchesSearch = r.studentId.toLowerCase().includes(searchText) ||
                               r.name.toLowerCase().includes(searchText) ||
                               r.email.toLowerCase().includes(searchText) ||
@@ -594,9 +585,8 @@
         return matchesYear && (searchText === '' ? true : matchesSearch);
       });
 
-      // 2. 🔥 【關鍵修改】將符合篩選條件的資料「按學號由大到小排序」
+      // 排序邏輯：學號由大到小排序
       filtered.sort((a, b) => {
-        // 先嘗試使用 localeCompare 進行字串/數字比較 (數字優先大到小)
         return b.studentId.localeCompare(a.studentId, undefined, { numeric: true, sensitivity: 'base' });
       });
 
@@ -605,18 +595,19 @@
         return;
       }
 
-      // 3. 渲染至表格畫面
       filtered.forEach(r => {
         const tr = document.createElement('tr');
         const isOneYearExpired = checkIsOneYearExpired(r);
 
-        // 若為「作廢」或「一學年過期」，均自動劃掉 (套用刪除線樣式)
         if (r.isDeleted || isOneYearExpired) {
           tr.classList.add('deleted-row');
         }
 
         let detailText = `${r.planName}`;
-        if (r.hasTshirt) detailText += `<br><b style="color:#d9534f;">[加購系服 +$200]</b>`;
+        const count = r.tshirtCount ?? (r.hasTshirt ? 1 : 0);
+        if (count > 0) {
+          detailText += `<br><b style="color:#d9534f;">[加購系服 ${count} 件 +$${count * 200}]</b>`;
+        }
 
         let payText = `$${r.totalAmount} (${r.paymentMethod}`;
         if (r.paymentMethod === '轉帳' && r.bankLast5) payText += `-${r.bankLast5}`;
@@ -666,15 +657,15 @@
 
     window.exportCSV = () => {
       if (records.length === 0) { alert("目前沒有資料可供匯出！"); return; }
-      let csvContent = "\uFEFF狀態,學號,姓名,Email,繳費方案,加購系服,總金額,付款方式,末5碼,備註,收費人員,登記時間,刪除/作廢者\n";
+      let csvContent = "\uFEFF狀態,學號,姓名,Email,繳費方案,加購系服件數,總金額,付款方式,末5碼,備註,收費人員,登記時間,刪除/作廢者\n";
       records.forEach(r => {
         const isExpired = checkIsOneYearExpired(r);
         let status = "正常";
         if (r.isDeleted) status = "已作廢";
         else if (isExpired) status = "會員到期(滿1年)";
 
-        const tshirt = r.hasTshirt ? "是" : "否";
-        csvContent += `"${status}","${r.studentId}","${r.name}","${r.email}","${r.planName}","${tshirt}","${r.totalAmount}","${r.paymentMethod}","${r.bankLast5}","${r.note}","${r.collector}","${r.timestamp}","${r.deleter}"\n`;
+        const tshirt = r.tshirtCount ?? (r.hasTshirt ? 1 : 0);
+        csvContent += `"${status}","${r.studentId}","${r.name}","${r.email}","${r.planName}","${tshirt} 件","${r.totalAmount}","${r.paymentMethod}","${r.bankLast5}","${r.note}","${r.collector}","${r.timestamp}","${r.deleter}"\n`;
       });
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -694,7 +685,7 @@
       document.getElementById('paymentMethod').addEventListener('change', () => {
         document.getElementById('transferDetailPanel').style.display = document.getElementById('paymentMethod').value === '轉帳' ? 'block' : 'none';
       });
-      document.getElementById('hasTshirt').addEventListener('change', calculateTotal);
+      document.getElementById('tshirtCount').addEventListener('change', calculateTotal);
       document.getElementById('customAmount').addEventListener('input', calculateTotal);
       document.getElementById('yearFilter').addEventListener('change', renderTable);
       document.getElementById('searchInput').addEventListener('input', renderTable);
@@ -794,11 +785,16 @@
         </div>
       </div>
 
+      <!-- 👕 新增：系服數量選擇選項 -->
       <div class="form-group">
-        <label for="hasTshirt">加購系服一件 ($200)：</label>
-        <select id="hasTshirt">
-          <option value="no">否</option>
-          <option value="yes">是 (+$200)</option>
+        <label for="tshirtCount">加購系服件數 (每件 $200)：</label>
+        <select id="tshirtCount">
+          <option value="0">0 件 (不加購)</option>
+          <option value="1">1 件 (+$200)</option>
+          <option value="2">2 件 (+$400)</option>
+          <option value="3">3 件 (+$600)</option>
+          <option value="4">4 件 (+$800)</option>
+          <option value="5">5 件 (+$1000)</option>
         </select>
       </div>
 
@@ -844,7 +840,6 @@
     </div>
 
     <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-      <!-- Excel 匯入區塊 -->
       <div>
         <label for="excelFileInput" class="btn-success" style="display: inline-block; cursor: pointer;">
           📁 選擇 Excel (.xlsx) 匯入多筆資料
